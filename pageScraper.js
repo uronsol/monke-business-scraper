@@ -77,12 +77,11 @@ const scraperObject = {
         });
       let itemDetailUrls = [];
       // Get link for the item detail page
-      for (let paginationUrl in paginationUrls) {
-        let currentPageData = await paginationPromise(
-          paginationUrls[paginationUrl]
-        );
+      for (let i = 0; i < paginationUrls.length; i++) {
+        let currentPageData = await paginationPromise(paginationUrls[i]);
         itemDetailUrls = itemDetailUrls.concat(currentPageData);
       }
+      page.close();
       // Create promise to get individual item attributes
       let detailPromise = (link) =>
         new Promise(async (resolve, reject) => {
@@ -90,7 +89,6 @@ const scraperObject = {
             let detailPage = await browser.newPage();
             console.log(`Navigating to ${link}`);
             await detailPage.goto(link);
-            await delay(1000);
             const imageSrc = await detailPage.$$eval(
               "body > div > div > div.col-md-4 > img",
               (images) => {
@@ -123,32 +121,34 @@ const scraperObject = {
               }
             );
             attributeValues = attributeValues.reduce(
-              (attrs, attrValue) => attrs.concat(attrValue.split("s")),
+              (attrs, attrValue) => attrs.concat([attrValue.split("(")]),
               []
             );
             const attributes = attributeNames.reduce(
               (attrObj, attributeName, index) => {
-                const attributeValue = attributeValues[index];
-                const attributeValuesNormalized = attributeValue
-                  .split("(")
-                  .map((v) => {
-                    const normV = v.replace("%)", "");
-                    try {
+                const currentAttributeValues = attributeValues[index];
+                const attributeValuesNormalized = currentAttributeValues.map(
+                  (v) => {
+                    if (v.indexOf("%)") !== -1) {
+                      const normV = v.replace("%)", "").replace("(", "");
                       const percentValue = parseFloat(normV);
                       return percentValue;
-                    } catch (err) {
-                      return normV;
                     }
-                  });
+                    return v.trim();
+                  }
+                );
+
                 attrObj[attributeName] = {
-                  value: attributeValuesNormalized[0] || null,
+                  value:
+                    attributeValuesNormalized[0].length === 0
+                      ? null
+                      : attributeValuesNormalized[0],
                   percentile: attributeValuesNormalized[1] || null,
                 };
                 return attrObj;
               },
               {}
             );
-            await delay(1000);
             resolve({
               smbId,
               imageSrc,
@@ -169,19 +169,13 @@ const scraperObject = {
       return data;
     }
     let data = await scrapeCurrentPage();
-    fs.rmdirSync("output", { recursive: true });
-    fs.mkdirSync("output", { recursive: true }, (err) => {
-      if (err) throw err;
-    });
-    fs.mkdirSync("output/images", { recursive: true }, (err) => {
-      if (err) throw err;
-    });
+
+    fs.unlinkSync("output/monkes.json");
     for (let i = 0; i < data.length; i++) {
       const dataItem = data[i];
       const fileName = dataItem.imageSrc.substring(
         dataItem.imageSrc.lastIndexOf("/") + 1
       );
-      await download(dataItem.imageSrc, `output/images/${fileName}`);
       const smbId = dataItem.smbId;
       delete data[i].smbId;
       data[i] = {
@@ -189,7 +183,6 @@ const scraperObject = {
         imagePath: `output/images/${fileName}`,
         ...data[i],
       };
-      await delay(1000);
     }
     const dataWritten = fs.writeFileSync(
       "./output/monkes.json",
