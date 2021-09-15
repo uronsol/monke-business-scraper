@@ -1,0 +1,16 @@
+{
+  "name": "monke-scraper",
+  "version": "1.0.0",
+  "description": "Scraper for attributes related to the Solana Monkey Business NFT",
+  "main": "index.js",
+  "author": "uronsol <uronsolana@gmail.com>",
+  "license": "MIT",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "camelcase": "6.2.0",
+    "puppeteer": "10.2.0",
+    "request": "^2.88.2"
+  }
+}
